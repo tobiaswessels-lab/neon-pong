@@ -444,55 +444,50 @@ function applyHostState(msg) {
 // Countdown logic (host drives, guest follows via state sync)
 // ---------------------------------------------------------------------------
 
-let countdownValue       = 3;   // 3, 2, 1, then 0 = GO
-let goDisplayUntil       = 0;   // timestamp when GO phase ends
 let countdownPhaseStart  = 0;   // performance.now() when countdown began
-const COUNTDOWN_STEP_MS  = 1000;
-const GO_HOLD_MS         = 500; // show GO for this long before PLAYING
 
 function startCountdown() {
   window.pongState.status        = 'COUNTDOWN';
   window.pongState.countdown     = 3;
   window.pongState.countdownFrac = 1;
-  countdownValue                 = 3;
   countdownPhaseStart            = performance.now();
-  goDisplayUntil                 = 0;
 
   guestLastCountdown = 3;
   playCountdownBeep(false);
 }
 
+/**
+ * Simple countdown: 0-1s = "3", 1-2s = "2", 2-3s = "1", 3-3.5s = "GO!", then PLAYING.
+ * Total duration: 3.5 seconds.
+ */
 function updateCountdown(now) {
-  if (!isHost) return; // guest follows synced state
+  if (!isHost) return;
 
   const elapsed = now - countdownPhaseStart;
+  const state   = window.pongState;
 
-  if (countdownValue > 0) {
-    // Which second are we on? (0 = first second, 1 = second, 2 = third)
-    const secondIndex = Math.floor(elapsed / COUNTDOWN_STEP_MS);
-    const fracInSecond = 1 - (elapsed % COUNTDOWN_STEP_MS) / COUNTDOWN_STEP_MS;
+  if (elapsed < 3000) {
+    // Counting 3, 2, 1
+    const secondIndex  = Math.floor(elapsed / 1000);        // 0, 1, 2
+    const newCount     = 3 - secondIndex;                    // 3, 2, 1
+    const fracInSecond = 1 - (elapsed % 1000) / 1000;       // 1 -> 0
 
-    const newCount = 3 - secondIndex; // 3, 2, 1
-
-    if (newCount !== window.pongState.countdown && newCount >= 0) {
-      window.pongState.countdown = newCount;
-      if (newCount > 0) {
-        playCountdownBeep(false);
-      } else {
-        // Reached 0 = GO
-        playCountdownBeep(true);
-        goDisplayUntil = now + GO_HOLD_MS;
-      }
+    if (newCount !== state.countdown) {
+      state.countdown = newCount;
+      playCountdownBeep(false);
     }
-
-    window.pongState.countdownFrac = Math.max(0, Math.min(1, fracInSecond));
-    countdownValue = newCount;
-  }
-
-  // Transition to PLAYING after GO hold (must be outside countdownValue > 0 block)
-  if (countdownValue <= 0 && goDisplayUntil > 0 && now >= goDisplayUntil) {
-    window.pongState.status = 'PLAYING';
-    goDisplayUntil = 0;
+    state.countdownFrac = fracInSecond;
+  } else if (elapsed < 3500) {
+    // GO! phase
+    if (state.countdown !== 0) {
+      state.countdown = 0;
+      state.countdownFrac = 1;
+      playCountdownBeep(true);
+    }
+    state.countdownFrac = 1 - (elapsed - 3000) / 500;
+  } else {
+    // Transition to PLAYING
+    state.status = 'PLAYING';
     playGameStart();
   }
 }
