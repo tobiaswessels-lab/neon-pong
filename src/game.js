@@ -487,12 +487,13 @@ function updateCountdown(now) {
 
     window.pongState.countdownFrac = Math.max(0, Math.min(1, fracInSecond));
     countdownValue = newCount;
+  }
 
-    if (newCount <= 0 && now >= goDisplayUntil && goDisplayUntil > 0) {
-      // Transition to PLAYING
-      window.pongState.status = 'PLAYING';
-      playGameStart();
-    }
+  // Transition to PLAYING after GO hold (must be outside countdownValue > 0 block)
+  if (countdownValue <= 0 && goDisplayUntil > 0 && now >= goDisplayUntil) {
+    window.pongState.status = 'PLAYING';
+    goDisplayUntil = 0;
+    playGameStart();
   }
 }
 
