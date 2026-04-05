@@ -14,8 +14,9 @@ const H = THEME.CANVAS_HEIGHT;
 // ---------------------------------------------------------------------------
 
 export const MENU_BUTTONS = {
-  createGame: { x: 187, y: 448, w: 260, h: 54 },
-  joinGame:   { x: 577, y: 448, w: 260, h: 54 },
+  createGame: { x: 112, y: 448, w: 240, h: 54 },
+  joinGame:   { x: 392, y: 448, w: 240, h: 54 },
+  localGame:  { x: 672, y: 448, w: 240, h: 54 },
 };
 
 export const LOBBY_GUEST_BUTTONS = {
@@ -573,6 +574,24 @@ function renderMenu(ctx, state) {
     isHovered(mx, my, MENU_BUTTONS.joinGame),
     THEME.PADDLE_RIGHT_COLOR
   );
+  drawButton(
+    ctx,
+    'LOCAL GAME',
+    MENU_BUTTONS.localGame.x, MENU_BUTTONS.localGame.y,
+    MENU_BUTTONS.localGame.w, MENU_BUTTONS.localGame.h,
+    isHovered(mx, my, MENU_BUTTONS.localGame),
+    THEME.WIN_COLOR
+  );
+
+  // Controls hint for local mode
+  ctx.save();
+  setFont(ctx, 9);
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle    = 'rgba(255,255,255,0.35)';
+  ctx.shadowBlur   = 0;
+  ctx.fillText('LOCAL: W/S vs \u2191/\u2193  |  ONLINE: W/S or \u2191/\u2193', W / 2, 526);
+  ctx.restore();
 
   // High scores at the bottom
   if (state.highScores && state.highScores.length > 0) {

@@ -69,6 +69,7 @@ const PARTICLE_SZ_MAX    = THEME.PARTICLE_SIZE_MAX;
 // ---------------------------------------------------------------------------
 
 let isHost       = false;   // true after createRoom, false after joinRoom
+let isLocalMode  = false;   // true for local 2-player (same keyboard)
 let audioReady   = false;   // becomes true after first user gesture
 let lastTimestamp = 0;
 let hitCount     = 0;       // paddle hits in current rally (for sound pitch)
@@ -555,11 +556,13 @@ function checkWinCondition() {
 
 function updateHostPaddle(dt) {
   const left = window.pongState.players.left;
-  if (keys['w'] || keys['ArrowUp']) {
-    left.y -= PADDLE_SPEED * dt * 60;
-  }
-  if (keys['s'] || keys['ArrowDown']) {
-    left.y += PADDLE_SPEED * dt * 60;
+  if (isLocalMode) {
+    // Local mode: W/S for left paddle
+    if (keys['w']) left.y -= PADDLE_SPEED * dt * 60;
+    if (keys['s']) left.y += PADDLE_SPEED * dt * 60;
+  } else {
+    if (keys['w'] || keys['ArrowUp']) left.y -= PADDLE_SPEED * dt * 60;
+    if (keys['s'] || keys['ArrowDown']) left.y += PADDLE_SPEED * dt * 60;
   }
   left.y = Math.max(
     PADDLE_HEIGHT / 2,
@@ -579,6 +582,20 @@ function updateGuestPaddle(dt) {
   if (keys['s'] || keys['ArrowDown']) {
     right.y += PADDLE_SPEED * dt * 60;
   }
+  right.y = Math.max(
+    PADDLE_HEIGHT / 2,
+    Math.min(H - PADDLE_HEIGHT / 2, right.y),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Local mode: right paddle uses ArrowUp/ArrowDown
+// ---------------------------------------------------------------------------
+
+function updateLocalRightPaddle(dt) {
+  const right = window.pongState.players.right;
+  if (keys['ArrowUp']) right.y -= PADDLE_SPEED * dt * 60;
+  if (keys['ArrowDown']) right.y += PADDLE_SPEED * dt * 60;
   right.y = Math.max(
     PADDLE_HEIGHT / 2,
     Math.min(H - PADDLE_HEIGHT / 2, right.y),
@@ -620,6 +637,7 @@ function broadcastInput() {
 function resetToMenu() {
   disconnect();
   isHost = false;
+  isLocalMode = false;
   hitCount = 0;
   window.pongState = buildInitialState();
   window.pongState.highScores = loadHighScores();
@@ -776,7 +794,9 @@ function handleClick(mx, my) {
 }
 
 function handleMenuClick(mx, my, state) {
-  if (hitTest(mx, my, MENU_BUTTONS.createGame)) {
+  if (hitTest(mx, my, MENU_BUTTONS.localGame)) {
+    attemptLocalGame();
+  } else if (hitTest(mx, my, MENU_BUTTONS.createGame)) {
     attemptCreateGame();
   } else if (hitTest(mx, my, MENU_BUTTONS.joinGame)) {
     // Transition to guest lobby — re-use inputBuffer for room code entry
@@ -851,6 +871,23 @@ function attemptCreateGame() {
   );
 }
 
+function attemptLocalGame() {
+  const state = window.pongState;
+  const name  = state.inputBuffer.trim() || 'PLAYER 1';
+  state.playerName        = name.toUpperCase();
+  state.players.left.name = state.playerName;
+  state.players.right.name = 'PLAYER 2';
+  state.inputBuffer       = '';
+  state.focusedInput      = null;
+  state.networkError      = null;
+  isHost     = true;
+  isLocalMode = true;
+
+  resetScores();
+  resetBall();
+  startCountdown();
+}
+
 function attemptJoinRoom() {
   const state    = window.pongState;
   const code     = state.inputBuffer.trim().toUpperCase();
@@ -917,8 +954,9 @@ function update(dt, nowMs) {
     case 'COUNTDOWN':
       if (isHost) {
         updateHostPaddle(dt);
+        if (isLocalMode) updateLocalRightPaddle(dt);
         updateCountdown(nowMs);
-        broadcastState();
+        if (!isLocalMode) broadcastState();
       } else {
         updateGuestPaddle(dt);
         broadcastInput();
@@ -928,6 +966,7 @@ function update(dt, nowMs) {
     case 'PLAYING':
       if (isHost) {
         updateHostPaddle(dt);
+        if (isLocalMode) updateLocalRightPaddle(dt);
         updatePhysics(dt);
 
         // Timer
@@ -937,7 +976,7 @@ function update(dt, nowMs) {
           endGame();
         }
 
-        broadcastState();
+        if (!isLocalMode) broadcastState();
       } else {
         updateGuestPaddle(dt);
         broadcastInput();
